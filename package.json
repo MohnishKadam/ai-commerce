@@ -1,0 +1,22 @@
+{
+  "name": "ai-commerce",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.2.0",
+    "@prisma/client": "^7.2.0",
+    "dotenv": "^17.2.3",
+    "fastify": "^5.6.2",
+    "fastify-raw-body": "^5.0.0",
+    "pg": "^8.16.3",
+    "prisma": "^7.2.0",
+    "stripe": "^20.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.7"
+  }
+}
