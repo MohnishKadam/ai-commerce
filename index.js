@@ -143,29 +143,10 @@ app.post("/orders", async (req) => {
     console.log("Stripe event:", event.type);
   
     if (event.type === "payment_intent.succeeded") {
-        const paymentIntent = event.data.object;
-        const stripeId = paymentIntent.id;
-
-          console.log("Stripe paid:", stripeId);
-
-           const order = await prisma.order.findFirst({
-            where: { stripePaymentIntentId: stripeId }
-          });
-
-          if (!order) {
-            console.log("No order found for Stripe ID:", stripeId);
-            return { received: true };
-          }
-
-          await prisma.order.update({
-            where: { id: order.id },
-            data: { status: "PAID" }
-          });
-
-          console.log("Order marked PAID:", order.id);
-
-          return { received: true };
+        await processPaymentEvent(event);
+        return { received: true };
       }
+      
     });
   app.post("/confirm", async (req) => {
     const { paymentIntentId } = req.body;
@@ -176,4 +157,77 @@ app.post("/orders", async (req) => {
   
     return confirmed;
   });
+  
+
+  async function processPaymentEvent(event) {
+
+    const eventId = event.id;
+const eventType = event.type;
+
+const existingEvent = await prisma.processedEvent.findUnique({
+  where: { eventId }
+});
+
+if (existingEvent?.status === "COMPLETED") {
+  console.log("Event already processed:", eventId);
+  return;
+}
+
+if (!existingEvent) {
+  await prisma.processedEvent.create({
+    data: {
+      eventId,
+      eventType,
+      status: "STARTED"
+    }
+  });
+}
+
+
+    
+
+    const paymentIntent = event.data.object;
+  const stripeId = paymentIntent.id;
+
+  const order = await prisma.order.findFirst({
+    where: { stripePaymentIntentId: stripeId }
+  });
+
+  if (!order) {
+    console.log("No order found for Stripe ID:", stripeId);
+    return;
+  }
+
+  if (order.status === "PAID") {
+    // IMPORTANT: do nothing
+    console.log("Order already PAID:", order.id);
+    return;
+  }
+
+  await prisma.orderEvent.create({
+    data: {
+      orderId: order.id,
+      eventType: "PAYMENT_CONFIRMED",
+      source: "WEBHOOK",
+      referenceId: event.id,
+      metadata: {
+        stripePaymentIntentId: paymentIntent.id,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency
+      }
+    }
+  });
+
+  await prisma.order.update({
+    where: { id: order.id },
+    data: { status: "PAID" }
+  });
+
+  console.log("Order marked PAID:", order.id);
+
+  await prisma.processedEvent.update({
+    where: { eventId },
+    data: { status: "COMPLETED" }
+  });
+}
   
